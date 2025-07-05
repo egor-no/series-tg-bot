@@ -11,7 +11,9 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
 
     @Override
     public String getBotToken() {
-        return System.getenv("BOT_TOKEN");
+        String token = System.getenv("BOT_TOKEN");
+        System.out.println("TOKEN: " + token); // временно!
+        return token;
     }
 
     @Override
