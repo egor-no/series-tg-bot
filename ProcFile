@@ -1,1 +1,1 @@
-java -jar target/seriesprogressbot-1.0-jar-with-dependencies.jar
+java -jar target/telegram-bot-java-1.0-SNAPSHOT-jar-with-dependencies.jar
