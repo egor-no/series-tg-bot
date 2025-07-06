@@ -94,6 +94,10 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                 .text("📋 Статус")
                 .callbackData("status")
                 .build());
+        row.add(InlineKeyboardButton.builder()
+                .text("⚙ Установить прогресс")
+                .callbackData("set")
+                .build());
         rows.add(row);
 
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
