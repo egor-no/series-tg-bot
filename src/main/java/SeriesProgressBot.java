@@ -158,40 +158,10 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
             }
         }
 
+        //КНОПКИ
         if (update.hasCallbackQuery()) {
             String data = update.getCallbackQuery().getData();
             long chatId = update.getCallbackQuery().getMessage().getChatId();
-
-            switch (data) {
-                case "add" -> {
-                    userStates.put(chatId, "awaiting_add");
-                    sendReply(chatId, "Введи сериал (можно сразу с сезоном и эпизодом):", null);
-                }
-                case "set" -> {
-                    Map<String, int[]> series = userSeries.get(chatId);
-                    if (series == null || series.isEmpty()) {
-                        sendReply(chatId, "У тебя пока нет сериалов.", mainMenu);
-                        return;
-                    }
-
-                    userStates.put(chatId, "awaiting_set_choice");
-
-                    List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-                    for (String title : series.keySet()) {
-                        rows.add(List.of(InlineKeyboardButton.builder()
-                                .text(title)
-                                .callbackData("set_" + title)
-                                .build()));
-                    }
-
-                    InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-                    markup.setKeyboard(rows);
-
-                    sendReply(chatId, "Выбери сериал для обновления:", markup);
-                }
-                case "status" -> sendReply(chatId, handleStatus(chatId), mainMenu);
-                default -> sendReply(chatId, "Неизвестная кнопка.", mainMenu);
-            }
 
             if (userStates.get(chatId).equals("awaiting_set_choice") && data.startsWith("set_")) {
                 String title = data.substring(4);
@@ -234,6 +204,40 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                         userStates.remove(chatId);
                         selectedTitles.remove(chatId);
                     }
+                }
+                return;
+            }
+
+            switch (data) {
+                case "add" -> {
+                    userStates.put(chatId, "awaiting_add");
+                    sendReply(chatId, "Введи сериал (можно сразу с сезоном и эпизодом):", null);
+                }
+                case "set" -> {
+                    Map<String, int[]> series = userSeries.get(chatId);
+                    if (series == null || series.isEmpty()) {
+                        sendReply(chatId, "У тебя пока нет сериалов.", mainMenu);
+                        return;
+                    }
+
+                    userStates.put(chatId, "awaiting_set_choice");
+
+                    List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+                    for (String title : series.keySet()) {
+                        rows.add(List.of(InlineKeyboardButton.builder()
+                                .text(title)
+                                .callbackData("set_" + title)
+                                .build()));
+                    }
+
+                    InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+                    markup.setKeyboard(rows);
+
+                    sendReply(chatId, "Выбери сериал для обновления:", markup);
+                }
+                case "status" -> sendReply(chatId, handleStatus(chatId), mainMenu);
+                default -> {
+                    sendReply(chatId, "Неизвестная кнопка.", mainMenu);
                 }
             }
         }
