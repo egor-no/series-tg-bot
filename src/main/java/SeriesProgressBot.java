@@ -9,9 +9,7 @@ import java.util.*;
 public class SeriesProgressBot extends TelegramLongPollingBot {
 
     private final Map<Long, Map<String, int[]>> userSeries = new HashMap<>();
-    private final Map<Long, String> userStates = new HashMap<>();
-    private final Map<Long, String> selectedTitles = new HashMap<>();
-    private final Map<Long, Integer> manualSeason = new HashMap<>();
+    private final Map<Long, UserSession> sessions = new HashMap<>();
     private final InlineKeyboardMarkup mainMenu;
 
     public SeriesProgressBot() {
@@ -110,51 +108,54 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
         if (update.hasMessage() && update.getMessage().hasText()) {
             String text = update.getMessage().getText();
             long chatId = update.getMessage().getChatId();
+            UserSession session = sessions.computeIfAbsent(chatId, id -> new UserSession());
 
-            if ("awaiting_add".equals(userStates.get(chatId))) {
-                userStates.remove(chatId);
-                ParsedTitle parsed = parseTitleSeasonEpisode(text);
-                int season = parsed.season() >= 0 ? parsed.season() : 1;
-                int episode = parsed.episode() >= 0 ? parsed.episode() : 1;
+            switch (session.state) {
+                case AWAITING_ADD -> {
+                    session.state = State.IDLE;
+                    ParsedTitle parsed = parseTitleSeasonEpisode(text);
+                    int season = parsed.season() >= 0 ? parsed.season() : 1;
+                    int episode = parsed.episode() >= 0 ? parsed.episode() : 1;
 
-                userSeries.computeIfAbsent(chatId, k -> new HashMap<>())
-                        .put(parsed.title(), new int[]{season, episode});
+                    userSeries.computeIfAbsent(chatId, k -> new HashMap<>())
+                            .put(parsed.title(), new int[]{season, episode});
 
-                sendReply(chatId, "Добавлено: " + parsed.title() + " — Сезон " + season + ", Эпизод " + episode
-                        + ". Что ещё хочешь сделать?", mainMenu);
-                return;
-            } else if ("awaiting_set_season".equals(userStates.get(chatId))) {
-                try {
-                    int season = Integer.parseInt(text);
-                    userStates.put(chatId, "awaiting_set_episode");
-                    manualSeason.put(chatId, season);
-                    sendReply(chatId, "Теперь эпизод?", null);
-                } catch (NumberFormatException e) {
-                    sendReply(chatId, "Сезон должен быть числом", null);
+                    sendReply(chatId, "Добавлено: " + parsed.title() + " — Сезон " + season + ", Эпизод " + episode
+                            + ". Что ещё хочешь сделать?", mainMenu);
                 }
-                return;
-            } else if ("awaiting_set_episode".equals(userStates.get(chatId))) {
-                try {
-                    int episode = Integer.parseInt(text);
-                    String title = selectedTitles.get(chatId);
-                    int season = manualSeason.remove(chatId);
-
-                    userSeries.get(chatId).put(title, new int[]{season, episode});
-
-                    userStates.remove(chatId);
-                    selectedTitles.remove(chatId);
-
-                    sendReply(chatId, "Установлено: " + title + " — Сезон " + season + ", Эпизод " + episode, mainMenu);
-                } catch (NumberFormatException e) {
-                    sendReply(chatId, "Эпизод должен быть числом", null);
+                case AWAITING_SET_SEASON -> {
+                    try {
+                        int season = Integer.parseInt(text);
+                        session.manualSeason = season;
+                        session.state = State.AWAITING_SET_EPISODE;
+                        sendReply(chatId, "Теперь эпизод?", null);
+                    } catch (NumberFormatException e) {
+                        sendReply(chatId, "Сезон должен быть числом", null);
+                    }
                 }
-                return;
-            } else if (text.startsWith("/start")) {
-                sendReply(chatId, "Что хочешь сделать?", mainMenu);
-                return;
-            } else {
-                sendReply(chatId, "Неизвестная команда. Используй /start", null);
-                return;
+                case AWAITING_SET_EPISODE -> {
+                    try {
+                        int episode = Integer.parseInt(text);
+                        String title = session.selectedTitle;
+                        int season = session.manualSeason;
+
+                        userSeries.get(chatId).put(title, new int[]{season, episode});
+                        session.state = State.IDLE;
+                        session.selectedTitle = null;
+                        session.manualSeason = null;
+
+                        sendReply(chatId, "Установлено: " + title + " — Сезон " + season + ", Эпизод " + episode, mainMenu);
+                    } catch (NumberFormatException e) {
+                        sendReply(chatId, "Эпизод должен быть числом", null);
+                    }
+                }
+                default -> {
+                    if (text.equals("/start")) {
+                        sendReply(chatId, "Что хочешь сделать?", mainMenu);
+                    } else {
+                        sendReply(chatId, "Неизвестная команда. Используй /start", null);
+                    }
+                }
             }
         }
 
@@ -162,11 +163,12 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
         if (update.hasCallbackQuery()) {
             String data = update.getCallbackQuery().getData();
             long chatId = update.getCallbackQuery().getMessage().getChatId();
+            UserSession session = sessions.computeIfAbsent(chatId, id -> new UserSession());
 
-            if (userStates.get(chatId).equals("awaiting_set_choice") && data.startsWith("set_")) {
+            if (session.state == State.AWAITING_SET_CHOICE && data.startsWith("set_")) {
                 String title = data.substring(4);
-                selectedTitles.put(chatId, title);
-                userStates.put(chatId, "awaiting_set_action");
+                session.selectedTitle = title;
+                session.state = State.AWAITING_SET_ACTION;
 
                 InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
                 List<List<InlineKeyboardButton>> rows = List.of(
@@ -182,27 +184,27 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                 return;
             }
 
-            if ("awaiting_set_action".equals(userStates.get(chatId))) {
-                String title = selectedTitles.get(chatId);
+            if (session.state == State.AWAITING_SET_ACTION) {
+                String title = session.selectedTitle;
                 int[] current = userSeries.get(chatId).get(title);
 
                 switch (data) {
                     case "set_manual" -> {
-                        userStates.put(chatId, "awaiting_set_season");
+                        session.state = State.AWAITING_SET_SEASON;
                         sendReply(chatId, "Укажи сезон для \"" + title + "\":", null);
                     }
                     case "set_next_ep" -> {
                         current[1] += 1;
+                        session.state = State.IDLE;
+                        session.selectedTitle = null;
                         sendReply(chatId, "Обновлено: " + title + " — Сезон " + current[0] + ", Эпизод " + current[1], mainMenu);
-                        userStates.remove(chatId);
-                        selectedTitles.remove(chatId);
                     }
                     case "set_next_season" -> {
                         current[0] += 1;
                         current[1] = 1;
+                        session.state = State.IDLE;
+                        session.selectedTitle = null;
                         sendReply(chatId, "Обновлено: " + title + " — Сезон " + current[0] + ", Эпизод " + current[1], mainMenu);
-                        userStates.remove(chatId);
-                        selectedTitles.remove(chatId);
                     }
                 }
                 return;
@@ -210,7 +212,7 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
 
             switch (data) {
                 case "add" -> {
-                    userStates.put(chatId, "awaiting_add");
+                    session.state = State.AWAITING_ADD;
                     sendReply(chatId, "Введи сериал (можно сразу с сезоном и эпизодом):", null);
                 }
                 case "set" -> {
@@ -220,7 +222,7 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                         return;
                     }
 
-                    userStates.put(chatId, "awaiting_set_choice");
+                    session.state = State.AWAITING_SET_CHOICE;
 
                     List<List<InlineKeyboardButton>> rows = new ArrayList<>();
                     for (String title : series.keySet()) {

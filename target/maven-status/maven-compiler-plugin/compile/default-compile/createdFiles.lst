@@ -1,4 +1,6 @@
 Main.class
-UserInput.class
 SeriesProgressBot.class
+SeriesProgressBot$1.class
 ParsedTitle.class
+State.class
+UserSession.class
