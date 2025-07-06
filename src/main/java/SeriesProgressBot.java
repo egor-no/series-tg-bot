@@ -10,6 +10,11 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
 
     private final Map<Long, Map<String, int[]>> userSeries = new HashMap<>();
     private final Map<Long, String> userStates = new HashMap<>();
+    private final InlineKeyboardMarkup mainMenu;
+
+    public SeriesProgressBot() {
+        this.mainMenu = buildMainMenu();
+    }
 
     @Override
     public String getBotUsername() {
@@ -76,6 +81,24 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
         return sb.toString();
     }
 
+    private InlineKeyboardMarkup buildMainMenu() {
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+        List<InlineKeyboardButton> row = new ArrayList<>();
+        row.add(InlineKeyboardButton.builder()
+                .text("➕ Добавить сериал")
+                .callbackData("add")
+                .build());
+        row.add(InlineKeyboardButton.builder()
+                .text("📋 Статус")
+                .callbackData("status")
+                .build());
+        rows.add(row);
+
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        markup.setKeyboard(rows);
+        return markup;
+    }
+
     @Override
     public void onUpdateReceived(Update update) {
         if (update.hasMessage() && update.getMessage().hasText()) {
@@ -91,25 +114,11 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                 userSeries.computeIfAbsent(chatId, k -> new HashMap<>())
                         .put(parsed.title(), new int[]{season, episode});
 
-                sendReply(chatId, "Добавлено: " + parsed.title() + " — Сезон " + season + ", Эпизод " + episode, null);
+                sendReply(chatId, "Добавлено: " + parsed.title() + " — Сезон " + season + ", Эпизод " + episode
+                        + ". Что ещё хочешь сделать?", mainMenu);
                 return;
             } else if (text.startsWith("/start")) {
-                InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-                List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-
-                List<InlineKeyboardButton> row = new ArrayList<>();
-                row.add(InlineKeyboardButton.builder()
-                        .text("➕ Добавить сериал")
-                        .callbackData("add")
-                        .build());
-                row.add(InlineKeyboardButton.builder()
-                        .text("📋 Статус")
-                        .callbackData("status")
-                        .build());
-                rows.add(row);
-                markup.setKeyboard(rows);
-
-                sendReply(chatId, "Что хочешь сделать?", markup);
+                sendReply(chatId, "Что хочешь сделать?", mainMenu);
             } else {
                 sendReply(chatId, "Неизвестная команда. Используй /start", null);
             }
@@ -124,10 +133,9 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                     userStates.put(chatId, "awaiting_add");
                     sendReply(chatId, "Введи сериал (можно сразу с сезоном и эпизодом):", null);
                 }
-                case "status" -> sendReply(chatId, handleStatus(chatId), null);
-                default -> sendReply(chatId, "Неизвестная кнопка.", null);
+                case "status" -> sendReply(chatId, handleStatus(chatId), mainMenu);
+                default -> sendReply(chatId, "Неизвестная кнопка.", mainMenu);
             }
-            return;
         }
     }
 
