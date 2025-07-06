@@ -212,7 +212,7 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                 return;
             }
 
-            if ("awaiting_set_choice".equals(userStates.get(chatId))) {
+            if ("awaiting_set_action".equals(userStates.get(chatId))) {
                 String title = selectedTitles.get(chatId);
                 int[] current = userSeries.get(chatId).get(title);
 
