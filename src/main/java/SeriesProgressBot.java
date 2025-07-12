@@ -2,6 +2,7 @@ import data.Series;
 import data.SeriesProgressService;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
@@ -67,6 +68,17 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
         return new ParsedTitle(title, season, episode);
     }
 
+    private void deleteMessage(long chatId, int messageId) {
+        try {
+            DeleteMessage deleteMessage = new DeleteMessage();
+            deleteMessage.setChatId(String.valueOf(chatId));
+            deleteMessage.setMessageId(messageId);
+            execute(deleteMessage);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     private String handleStatus(long chatId) {
         List<Series> seriesList = seriesService.getAll(chatId);
         if (seriesList.isEmpty()) {
@@ -74,7 +86,7 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
         }
         StringBuilder sb = new StringBuilder("Твои сериалы:\n");
         for (Series s : seriesList) {
-            String statusMark = s.getStatus().equals("finished") ? "🏁 " : "";
+            String statusMark = "finished".equalsIgnoreCase(s.getStatus()) ? "🏁 " : "";
             sb.append("• ").append(statusMark)
                     .append(s.getName())
                     .append(" — Сезон ").append(s.getSeason())
@@ -121,7 +133,7 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
 
         List<List<InlineKeyboardButton>> rows = seriesList.stream()
                 .map(s -> {
-                    boolean isFinished = "finished".equals(s.getStatus());
+                    boolean isFinished = "finished".equalsIgnoreCase(s.getStatus());
                     String prefix = isFinished ? "🏁 " : icon + " ";
                     return List.of(InlineKeyboardButton.builder()
                             .text(prefix + s.getName())
@@ -191,7 +203,6 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
 
                     session.state = State.IDLE;
                     session.selectedTitle = null;
-
                     sendReply(chatId, "Переименовано: \"" + oldTitle + "\" → \"" + newTitle + "\"", mainMenu);
                 }
                 default -> {
@@ -206,13 +217,14 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
 
         //КНОПКИ
         if (update.hasCallbackQuery()) {
-            System.out.println("CallbackQuery received: " + update.getCallbackQuery().getData());
-
             String data = update.getCallbackQuery().getData();
             long chatId = update.getCallbackQuery().getMessage().getChatId();
             UserSession session = sessions.computeIfAbsent(chatId, id -> new UserSession());
 
             if (session.state == State.AWAITING_SET_CHOICE && data.startsWith("set_")) {
+                int messageId = update.getCallbackQuery().getMessage().getMessageId();
+                deleteMessage(chatId, messageId);
+
                 String title = data.substring(4);
                 session.selectedTitle = title;
                 session.state = State.AWAITING_SET_ACTION;
@@ -272,6 +284,8 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                             seriesService.setStatus(chatId, title, "finished");
                             session.state = State.IDLE;
                             session.selectedTitle = null;
+                            int messageId = update.getCallbackQuery().getMessage().getMessageId();
+                            deleteMessage(chatId, messageId);
                             sendReply(chatId, "Вы закончили смотреть сериал \"" + title + "\" 🎉. Теперь он отмечен как завершённый. ", mainMenu);
                             return;
                         }
@@ -280,6 +294,8 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                             seriesService.saveOrUpdate(chatId, title, 1, 1);
                             session.state = State.IDLE;
                             session.selectedTitle = null;
+                            int messageId = update.getCallbackQuery().getMessage().getMessageId();
+                            deleteMessage(chatId, messageId);
                             sendReply(chatId, "Сериал \"" + title + "\" сброшен: снова Сезон 1, Эпизод 1.", mainMenu);
                             return;
                         }
@@ -296,6 +312,8 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
             if (session.state == State.AWAITING_DELETE_CHOICE && data.startsWith("delete_")) {
                 String title = data.substring("delete_".length());
                 seriesService.delete(chatId, title);
+                int messageId = update.getCallbackQuery().getMessage().getMessageId();
+                deleteMessage(chatId, messageId);
                 sendReply(chatId, "Сериал \"" + title + "\" удалён.", mainMenu);
                 session.state = State.IDLE;
                 return;
@@ -305,11 +323,12 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                 String oldTitle = data.substring(7);
                 session.selectedTitle = oldTitle;
                 session.state = State.AWAITING_RENAME_INPUT;
+                int messageId = update.getCallbackQuery().getMessage().getMessageId();
+                deleteMessage(chatId, messageId);
                 sendReply(chatId, "Введи новое название для \"" + oldTitle + "\":", null);
                 return;
             }
 
-            System.out.println("Callback data: " + data);
             switch (data) {
                 case "add" -> {
                     session.state = State.AWAITING_ADD;
@@ -318,6 +337,8 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                 case "set" -> {
                     List<Series> list = seriesService.getAll(chatId);
                     if (list.isEmpty()) {
+                        int messageId = update.getCallbackQuery().getMessage().getMessageId();
+                        deleteMessage(chatId, messageId);
                         sendReply(chatId, "У тебя пока нет сериалов.", mainMenu);
                         return;
                     }
@@ -327,6 +348,8 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                 }
                 case "rename" -> {
                     List<Series> list = seriesService.getAll(chatId);
+                    int messageId = update.getCallbackQuery().getMessage().getMessageId();
+                    deleteMessage(chatId, messageId);
                     if (list.isEmpty()) {
                         sendReply(chatId, "У тебя пока нет сериалов.", mainMenu);
                         return;
@@ -337,6 +360,8 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                 }
                 case "delete" -> {
                     List<Series> list = seriesService.getAll(chatId);
+                    int messageId = update.getCallbackQuery().getMessage().getMessageId();
+                    deleteMessage(chatId, messageId);
                     if (list.isEmpty()) {
                         sendReply(chatId, "У тебя пока нет сериалов.", mainMenu);
                         return;
@@ -346,6 +371,8 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                             buildSeriesChoiceMenu(chatId, "delete_", "❌"));
                 }
                 case "status" -> {
+                    int messageId = update.getCallbackQuery().getMessage().getMessageId();
+                    deleteMessage(chatId, messageId);
                     try {
                         sendReply(chatId, handleStatus(chatId), mainMenu);
                     } catch (Exception e) {
@@ -354,6 +381,8 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                     }
                 }
                 default -> {
+                    int messageId = update.getCallbackQuery().getMessage().getMessageId();
+                    deleteMessage(chatId, messageId);
                     System.out.println("Unhandled callback: " + data);
                     sendReply(chatId, "Неизвестная кнопка.", mainMenu);
                 }
