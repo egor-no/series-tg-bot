@@ -27,9 +27,7 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
 
     @Override
     public String getBotToken() {
-        String token = System.getenv("BOT_TOKEN");
-        System.out.println("TOKEN: " + token); // временно!
-        return token;
+        return System.getenv("BOT_TOKEN");
     }
 
     private void sendReply(long chatId, String text, InlineKeyboardMarkup markup) {
@@ -256,6 +254,14 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                 Series s = seriesService.getByName(chatId, title);
 
                 if (s != null) {
+                    if (!data.startsWith("set_")
+                            && !data.startsWith("rename_")
+                            && !data.startsWith("delete_")
+                            && !Set.of("set_manual", "set_next_ep", "set_next_season", "set_finish", "set_restart").contains(data)) {
+                        session.state = State.IDLE;
+                        session.selectedTitle = null;
+                    }
+
                     switch (data) {
                         case "set_manual" -> {
                             session.state = State.AWAITING_SET_SEASON;

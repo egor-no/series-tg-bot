@@ -10,20 +10,12 @@ public class SeriesProgressService {
         this.dao = new SeriesProgressDAO(DataSourceProvider.getDataSource());
     }
 
-    public void saveOrUpdate(long chatId, String name, int season, int episode) {
-        try {
-            dao.saveOrUpdate(chatId, name, season, episode);
-        } catch (SQLException e) {
-            e.printStackTrace(); // можно заменить на логгер
-        }
-    }
-
     public List<Series> getAll(long chatId) {
         try {
             return dao.getAllForUser(chatId);
         } catch (SQLException e) {
             e.printStackTrace();
-            return List.of(); // пустой список
+            return List.of();
         }
     }
 
@@ -39,6 +31,15 @@ public class SeriesProgressService {
     public void setStatus(long chatId, String name, String status) {
         try {
             dao.setStatus(chatId, name, status);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void saveOrUpdate(long chatId, String name, int season, int episode) {
+        try {
+            dao.saveOrUpdate(chatId, name, season, episode);
+            dao.clearStatus(chatId, name);
         } catch (SQLException e) {
             e.printStackTrace();
         }

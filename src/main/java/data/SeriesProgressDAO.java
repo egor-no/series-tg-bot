@@ -91,6 +91,19 @@ public class SeriesProgressDAO {
         }
     }
 
+    public void clearStatus(long chatId, String name) throws SQLException {
+        try (Connection conn = dataSource.getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement("""
+            UPDATE series_progress
+            SET status = ''
+            WHERE chat_id = ? AND series_name = ?
+        """);
+            stmt.setLong(1, chatId);
+            stmt.setString(2, name);
+            stmt.executeUpdate();
+        }
+    }
+
     public void delete(long chatId, String name) throws SQLException {
         try (Connection conn = dataSource.getConnection()) {
             PreparedStatement stmt = conn.prepareStatement("DELETE FROM series_progress WHERE chat_id = ? AND series_name = ?");
