@@ -14,13 +14,19 @@ public class Main {
             e.printStackTrace();
         }
 
-        try {
-            DataSource ds = DataSourceProvider.getDataSource();
-            ds.getConnection().close();
-            System.out.println("✅ Connection to Railway DB successful!");
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        System.out.println("MYSQLHOST: " + System.getenv("MYSQLHOST"));
+        System.out.println("MYSQLPORT: " + System.getenv("MYSQLPORT"));
+        System.out.println("MYSQLDATABASE: " + System.getenv("MYSQLDATABASE"));
+        System.out.println("MYSQLUSER: " + System.getenv("MYSQLUSER"));
+        System.out.println("MYSQLPASSWORD: " + System.getenv("MYSQLPASSWORD"));
+
+//        try {
+//            DataSource ds = DataSourceProvider.getDataSource();
+//            ds.getConnection().close();
+//            System.out.println("✅ Connection to Railway DB successful!");
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
     }
 
 }
