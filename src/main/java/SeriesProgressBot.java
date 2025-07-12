@@ -89,6 +89,10 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                 .callbackData("add")
                 .build());
         row.add(InlineKeyboardButton.builder()
+                .text("\uFE0F Переименовать сериал")
+                .callbackData("rename")
+                .build());
+        row.add(InlineKeyboardButton.builder()
                 .text("✏ Удалить сериал")
                 .callbackData("delete")
                 .build());
@@ -154,6 +158,29 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                     } catch (NumberFormatException e) {
                         sendReply(chatId, "Эпизод должен быть числом", null);
                     }
+                }
+                case AWAITING_RENAME_INPUT -> {
+                    String oldTitle = session.selectedTitle;
+                    String newTitle = text.trim();
+
+                    if (newTitle.isEmpty()) {
+                        sendReply(chatId, "Новое название не может быть пустым.", null);
+                        return;
+                    }
+
+                    Map<String, int[]> series = userSeries.get(chatId);
+                    if (series.containsKey(newTitle)) {
+                        sendReply(chatId, "Сериал с таким названием уже есть.", null);
+                        return;
+                    }
+
+                    int[] progress = series.remove(oldTitle);
+                    series.put(newTitle, progress);
+
+                    session.state = State.IDLE;
+                    session.selectedTitle = null;
+
+                    sendReply(chatId, "Переименовано: \"" + oldTitle + "\" → \"" + newTitle + "\"", mainMenu);
                 }
                 default -> {
                     if (text.equals("/start")) {
@@ -231,6 +258,14 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                 return;
             }
 
+            if (session.state == State.AWAITING_RENAME_CHOICE && data.startsWith("rename_")) {
+                String oldTitle = data.substring(7);
+                session.selectedTitle = oldTitle;
+                session.state = State.AWAITING_RENAME_INPUT;
+                sendReply(chatId, "Введи новое название для \"" + oldTitle + "\":", null);
+                return;
+            }
+
             switch (data) {
                 case "add" -> {
                     session.state = State.AWAITING_ADD;
@@ -257,6 +292,29 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                     markup.setKeyboard(rows);
 
                     sendReply(chatId, "Выбери сериал для обновления:", markup);
+                }
+                case "rename" -> {
+                    Map<String, int[]> series = userSeries.get(chatId);
+                    if (series == null || series.isEmpty()) {
+                        sendReply(chatId, "У тебя пока нет сериалов.", mainMenu);
+                        return;
+                    }
+
+                    session.state = State.AWAITING_RENAME_CHOICE;
+
+                    List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+                    for (String title : series.keySet()) {
+                        rows.add(List.of(InlineKeyboardButton.builder()
+                                .text(title)
+                                .callbackData("rename_" + title)
+                                .build()));
+                    }
+
+                    InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+                    markup.setKeyboard(rows);
+
+                    sendReply(chatId, "Выбери сериал для переименования:", markup);
+                    return;
                 }
                 case "delete" -> {
                     Map<String, int[]> series = userSeries.get(chatId);
