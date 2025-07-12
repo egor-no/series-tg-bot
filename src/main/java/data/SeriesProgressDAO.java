@@ -47,11 +47,34 @@ public class SeriesProgressDAO {
                 result.add(new Series(
                         rs.getString("series_name"),
                         rs.getInt("season"),
-                        rs.getInt("episode")
+                        rs.getInt("episode"),
+                        rs.getString("status")
                 ));
             }
         }
         return result;
+    }
+
+    public Series getByName(long chatId, String name) throws SQLException {
+        try (Connection conn = dataSource.getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement("""
+            SELECT series_name, season, episode, status
+            FROM series_progress
+            WHERE chat_id = ? AND series_name = ?
+        """);
+            stmt.setLong(1, chatId);
+            stmt.setString(2, name);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return new Series(
+                        rs.getString("series_name"),
+                        rs.getInt("season"),
+                        rs.getInt("episode"),
+                        rs.getString("status")
+                );
+            }
+            return null;
+        }
     }
 
     public void setStatus(long chatId, String name, String status) throws SQLException {

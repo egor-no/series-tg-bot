@@ -77,10 +77,10 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
         StringBuilder sb = new StringBuilder("Твои сериалы:\n");
         for (Series s : seriesList) {
             String statusMark = s.getStatus().equals("finished") ? "🏁 " : "";
-            sb.append("• ").append(s.getName())
+            sb.append("• ").append(statusMark)
+                    .append(s.getName())
                     .append(" — Сезон ").append(s.getSeason())
                     .append(", Эпизод ").append(s.getEpisode())
-                    .append(statusMark)
                     .append("\n");
         }
         return sb.toString();
@@ -122,15 +122,17 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
         List<Series> seriesList = seriesService.getAll(chatId);
 
         List<List<InlineKeyboardButton>> rows = seriesList.stream()
-                .map(s -> List.of(InlineKeyboardButton.builder()
-                        .text(icon + " " + s.getName())
-                        .callbackData(callbackPrefix + s.getName())
-                        .build()))
+                .map(s -> {
+                    boolean isFinished = "finished".equals(s.getStatus());
+                    String prefix = isFinished ? "🏁 " : icon + " ";
+                    return List.of(InlineKeyboardButton.builder()
+                            .text(prefix + s.getName())
+                            .callbackData(callbackPrefix + s.getName())
+                            .build());
+                })
                 .collect(Collectors.toList());
 
-        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-        markup.setKeyboard(rows);
-        return markup;
+        return InlineKeyboardMarkup.builder().keyboard(rows).build();
     }
 
     @Override
@@ -183,8 +185,7 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                         return;
                     }
 
-                    Series s = seriesService.getAll(chatId).stream()
-                            .filter(x -> x.getName().equals(oldTitle)).findFirst().orElse(null);
+                    Series s = seriesService.getByName(chatId, oldTitle);
                     if (s != null) {
                         seriesService.delete(chatId, oldTitle);
                         seriesService.saveOrUpdate(chatId, newTitle, s.getSeason(), s.getEpisode());
@@ -216,8 +217,7 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                 session.selectedTitle = title;
                 session.state = State.AWAITING_SET_ACTION;
 
-                Series s = seriesService.getAll(chatId).stream()
-                        .filter(x -> x.getName().equals(title)).findFirst().orElse(null);
+                Series s = seriesService.getByName(chatId, title);
 
                 if (s == null) {
                     sendReply(chatId, "Сериал не найден.", mainMenu);
@@ -253,8 +253,7 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
 
             if (session.state == State.AWAITING_SET_ACTION) {
                 String title = session.selectedTitle;
-                Series s = seriesService.getAll(chatId).stream()
-                        .filter(x -> x.getName().equals(title)).findFirst().orElse(null);
+                Series s = seriesService.getByName(chatId, title);
 
                 if (s != null) {
                     switch (data) {

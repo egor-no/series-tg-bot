@@ -6,10 +6,11 @@ public class Series {
     private int episode;
     private String status = "";
 
-    public Series(String name, int season, int episode) {
+    public Series(String name, int season, int episode, String status) {
         this.name = name;
         this.season = season;
         this.episode = episode;
+        this.status = status;
     }
 
     public String getName() {

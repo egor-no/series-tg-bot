@@ -27,6 +27,15 @@ public class SeriesProgressService {
         }
     }
 
+    public Series getByName(long chatId, String name) {
+        try {
+            return dao.getByName(chatId, name);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
     public void setStatus(long chatId, String name, String status) {
         try {
             dao.setStatus(chatId, name, status);
