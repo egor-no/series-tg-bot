@@ -118,7 +118,7 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                 .callbackData("status")
                 .build());
         row.add(InlineKeyboardButton.builder()
-                .text("⚙ Установить прогресс")
+                .text("⚙ Обновить прогресс")
                 .callbackData("set")
                 .build());
         rows.add(row);
@@ -222,10 +222,7 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
             UserSession session = sessions.computeIfAbsent(chatId, id -> new UserSession());
 
             if (session.state == State.AWAITING_SET_CHOICE && data.startsWith("set_")) {
-                int messageId = update.getCallbackQuery().getMessage().getMessageId();
-                deleteMessage(chatId, messageId);
-
-                String title = data.substring(4);
+                      String title = data.substring(4);
                 session.selectedTitle = title;
                 session.state = State.AWAITING_SET_ACTION;
 
@@ -259,6 +256,9 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
 
                 markup.setKeyboard(rows);
 
+                int messageId = update.getCallbackQuery().getMessage().getMessageId();
+                deleteMessage(chatId, messageId);
+
                 sendReply(chatId, "Как хотите обновить ваш прогресс с \"" + title + "\"?", markup);
                 return;
             }
@@ -268,6 +268,8 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                 Series s = seriesService.getByName(chatId, title);
 
                 if (s != null) {
+                    int messageId = update.getCallbackQuery().getMessage().getMessageId();
+                    deleteMessage(chatId, messageId);
                     switch (data) {
                         case "set_manual" -> {
                             session.state = State.AWAITING_SET_SEASON;
@@ -284,8 +286,6 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                             seriesService.setStatus(chatId, title, "finished");
                             session.state = State.IDLE;
                             session.selectedTitle = null;
-                            int messageId = update.getCallbackQuery().getMessage().getMessageId();
-                            deleteMessage(chatId, messageId);
                             sendReply(chatId, "Вы закончили смотреть сериал \"" + title + "\" 🎉. Теперь он отмечен как завершённый. ", mainMenu);
                             return;
                         }
@@ -294,8 +294,6 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                             seriesService.saveOrUpdate(chatId, title, 1, 1);
                             session.state = State.IDLE;
                             session.selectedTitle = null;
-                            int messageId = update.getCallbackQuery().getMessage().getMessageId();
-                            deleteMessage(chatId, messageId);
                             sendReply(chatId, "Сериал \"" + title + "\" сброшен: снова Сезон 1, Эпизод 1.", mainMenu);
                             return;
                         }
@@ -305,7 +303,13 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
 
                 session.state = State.IDLE;
                 session.selectedTitle = null;
-                sendReply(chatId, "Обновлено: " + title, mainMenu);
+
+                Series updated = seriesService.getByName(chatId, title);
+                if (updated != null) {
+                    sendReply(chatId, "Обновлено: " + title + " — Сезон " + updated.getSeason() + ", Эпизод " + updated.getEpisode(), mainMenu);
+                } else {
+                    sendReply(chatId, "Обновление завершено, но сериал не найден.", mainMenu);
+                }
                 return;
             }
 
