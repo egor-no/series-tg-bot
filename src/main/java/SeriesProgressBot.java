@@ -89,6 +89,12 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                 .callbackData("add")
                 .build());
         row.add(InlineKeyboardButton.builder()
+                .text("✏ Удалить сериал")
+                .callbackData("delete")
+                .build());
+        rows.add(row);
+        row = new ArrayList<>();
+        row.add(InlineKeyboardButton.builder()
                 .text("📋 Статус")
                 .callbackData("status")
                 .build());
@@ -210,6 +216,21 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                 return;
             }
 
+            if (session.state == State.AWAITING_DELETE_CHOICE && data.startsWith("delete_")) {
+                String title = data.substring("delete_".length());
+                Map<String, int[]> series = userSeries.get(chatId);
+
+                if (series != null && series.containsKey(title)) {
+                    series.remove(title);
+                    sendReply(chatId, "Сериал \"" + title + "\" удалён.", mainMenu);
+                } else {
+                    sendReply(chatId, "Сериал не найден.", mainMenu);
+                }
+
+                session.state = State.IDLE;
+                return;
+            }
+
             switch (data) {
                 case "add" -> {
                     session.state = State.AWAITING_ADD;
@@ -237,6 +258,30 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
 
                     sendReply(chatId, "Выбери сериал для обновления:", markup);
                 }
+                case "delete" -> {
+                    Map<String, int[]> series = userSeries.get(chatId);
+                    if (series == null || series.isEmpty()) {
+                        sendReply(chatId, "У тебя пока нет сериалов.", mainMenu);
+                        return;
+                    }
+
+                    session.state = State.AWAITING_DELETE_CHOICE;
+
+                    List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+                    for (String title : series.keySet()) {
+                        rows.add(List.of(
+                                InlineKeyboardButton.builder()
+                                        .text("🗑 " + title)
+                                        .callbackData("delete_" + title)
+                                        .build()
+                        ));
+                    }
+
+                    InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+                    markup.setKeyboard(rows);
+
+                    sendReply(chatId, "Выбери сериал для удаления:", markup);
+                }
                 case "status" -> sendReply(chatId, handleStatus(chatId), mainMenu);
                 default -> {
                     sendReply(chatId, "Неизвестная кнопка.", mainMenu);
@@ -244,63 +289,7 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
             }
         }
     }
-
-//    @Override
-//    public void onUpdateReceived(Update update) {
-//        if (update.hasMessage() && update.getMessage().hasText()) {
-//            String text = update.getMessage().getText();
-//            long chatId = update.getMessage().getChatId();
-//            String reply;
-//
-//            if (text.startsWith("/add")) {
-//                ParsedTitle parsed = parseTitleSeasonEpisode(text.substring(4).trim());
-//                if (parsed.title().isEmpty()) {
-//                    reply = "Формат: /add <название> [<сезон> <эпизод>]";
-//                } else {
-//                    int season = parsed.season() >= 0 ? parsed.season() : 0;
-//                    int episode = parsed.episode() >= 0 ? parsed.episode() : 0;
-//
-//                    userSeries.computeIfAbsent(chatId, k -> new HashMap<>())
-//                            .put(parsed.title(), new int[]{season, episode});
-//
-//                    reply = "Сериал \"" + parsed.title() + "\" добавлен: Сезон " + season + ", Эпизод " + episode;
-//                }
-//            } else if (text.startsWith("/set")) {
-//                ParsedTitle parsed = parseTitleSeasonEpisode(text.substring(4).trim());
-//                if (parsed.season() < 0 || parsed.episode() < 0) {
-//                    reply = "Формат: /set <название> <сезон> <эпизод>";
-//                } else {
-//                    Map<String, int[]> series = userSeries.computeIfAbsent(chatId, k -> new HashMap<>());
-//                    if (!series.containsKey(parsed.title())) {
-//                        reply = "Сначала добавь сериал командой /add";
-//                    } else {
-//                        series.put(parsed.title(), new int[]{parsed.season(), parsed.episode()});
-//                        reply = "Установлено: " + parsed.title() + " — Сезон " + parsed.season() + ", Эпизод " + parsed.episode();
-//                    }
-//                }
-//            } else if (text.equals("/status")) {
-//                Map<String, int[]> series = userSeries.get(chatId);
-//                if (series == null || series.isEmpty()) {
-//                    reply = "Ты пока не добавил ни одного сериала.";
-//                } else {
-//                    StringBuilder sb = new StringBuilder("Твои сериалы:\n");
-//                    for (Map.Entry<String, int[]> entry : series.entrySet()) {
-//                        int[] progress = entry.getValue();
-//                        sb.append("• ").append(entry.getKey())
-//                                .append(" — Сезон ").append(progress[0])
-//                                .append(", Эпизод ").append(progress[1])
-//                                .append("\n");
-//                    }
-//                    reply = sb.toString();
-//                }
-//
-//            } else {
-//                reply = "Команды: /add, /set, /status";
-//            }
-//
-//            sendReply(chatId, reply);
-//        }
-//    }
 }
 
 record ParsedTitle(String title, Integer season, Integer episode) {}
+
