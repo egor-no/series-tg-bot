@@ -8,3 +8,4 @@ ParsedTitle.class
 data\SeriesProgressDAO.class
 SeriesStorage.class
 data\Series.class
+data\SeriesProgressService.class
