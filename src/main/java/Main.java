@@ -13,7 +13,12 @@ public class Main {
         } catch (Exception e) {
             e.printStackTrace();
         }
-
+        System.out.println("ENV VARS:");
+        for (String key : System.getenv().keySet()) {
+            if (key.toLowerCase().contains("sql")) {
+                System.out.println(key + " = " + System.getenv(key));
+            }
+        }
         System.out.println("MYSQLHOST: " + System.getenv("MYSQLHOST"));
         System.out.println("MYSQLPORT: " + System.getenv("MYSQLPORT"));
         System.out.println("MYSQLDATABASE: " + System.getenv("MYSQLDATABASE"));
