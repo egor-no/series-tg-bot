@@ -33,7 +33,14 @@ public class SeriesProgressDAO {
     public List<Series> getAllForUser(long chatId) throws SQLException {
         List<Series> result = new ArrayList<>();
         try (Connection conn = dataSource.getConnection()) {
-            PreparedStatement stmt = conn.prepareStatement("SELECT series_name, season, episode FROM series_progress WHERE chat_id = ?");
+            PreparedStatement stmt = conn.prepareStatement("""
+                    SELECT series_name, season, episode, status
+                    FROM series_progress
+                    WHERE chat_id = ?
+                    ORDER BY
+                        CASE WHEN status IS NULL OR status = '' THEN 0 ELSE 1 END,
+                        series_name COLLATE utf8mb4_unicode_ci
+                """);
             stmt.setLong(1, chatId);
             ResultSet rs = stmt.executeQuery();
             while (rs.next()) {
@@ -45,6 +52,20 @@ public class SeriesProgressDAO {
             }
         }
         return result;
+    }
+
+    public void setStatus(long chatId, String name, String status) throws SQLException {
+        try (Connection conn = dataSource.getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement("""
+            UPDATE series_progress
+            SET status = ?
+            WHERE chat_id = ? AND series_name = ?
+        """);
+            stmt.setString(1, status);
+            stmt.setLong(2, chatId);
+            stmt.setString(3, name);
+            stmt.executeUpdate();
+        }
     }
 
     public void delete(long chatId, String name) throws SQLException {

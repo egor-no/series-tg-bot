@@ -27,6 +27,14 @@ public class SeriesProgressService {
         }
     }
 
+    public void setStatus(long chatId, String name, String status) {
+        try {
+            dao.setStatus(chatId, name, status);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
     public void delete(long chatId, String name) {
         try {
             dao.delete(chatId, name);

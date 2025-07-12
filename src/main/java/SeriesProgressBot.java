@@ -76,9 +76,11 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
         }
         StringBuilder sb = new StringBuilder("Твои сериалы:\n");
         for (Series s : seriesList) {
+            String statusMark = s.getStatus().equals("finished") ? "🏁 " : "";
             sb.append("• ").append(s.getName())
                     .append(" — Сезон ").append(s.getSeason())
                     .append(", Эпизод ").append(s.getEpisode())
+                    .append(statusMark)
                     .append("\n");
         }
         return sb.toString();
@@ -197,7 +199,7 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                     if (text.equals("/start")) {
                         sendReply(chatId, "Что хочешь сделать?", mainMenu);
                     } else {
-                        sendReply(chatId, "Неизвестная команда. Используй /start", null);
+                        sendReply(chatId, "Неизвестная команда. Выбери из меню", mainMenu);
                     }
                 }
             }
@@ -214,17 +216,38 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                 session.selectedTitle = title;
                 session.state = State.AWAITING_SET_ACTION;
 
+                Series s = seriesService.getAll(chatId).stream()
+                        .filter(x -> x.getName().equals(title)).findFirst().orElse(null);
+
+                if (s == null) {
+                    sendReply(chatId, "Сериал не найден.", mainMenu);
+                    session.state = State.IDLE;
+                    return;
+                }
+
                 InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-                List<List<InlineKeyboardButton>> rows = List.of(
-                        List.of(
+                List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+                rows.add(List.of(
                                 InlineKeyboardButton.builder().text("🎯 Вручную").callbackData("set_manual").build(),
+                                InlineKeyboardButton.builder().text("🏁 Сериал закончен").callbackData("set_finish").build()
+                         ));
+                rows.add(List.of(
                                 InlineKeyboardButton.builder().text("⏭ Следующий эпизод").callbackData("set_next_ep").build(),
                                 InlineKeyboardButton.builder().text("📅 Следующий сезон").callbackData("set_next_season").build()
-                        )
-                );
+                        ));
+
+                if ("finished".equalsIgnoreCase(s.getStatus())) {
+                    rows.add(List.of(
+                            InlineKeyboardButton.builder()
+                                    .text("🎬 Начать заново")
+                                    .callbackData("set_restart")
+                                    .build()
+                    ));
+                }
+
                 markup.setKeyboard(rows);
 
-                sendReply(chatId, "Что сделать с \"" + title + "\"?", markup);
+                sendReply(chatId, "Как хотите обновить ваш прогресс с \"" + title + "\"?", markup);
                 return;
             }
 
@@ -245,6 +268,21 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                         }
                         case "set_next_season" -> {
                             seriesService.saveOrUpdate(chatId, title, s.getSeason() + 1, 1);
+                        }
+                        case "set_finish" -> {
+                            seriesService.setStatus(chatId, title, "finished");
+                            session.state = State.IDLE;
+                            session.selectedTitle = null;
+                            sendReply(chatId, "Вы закончили смотреть сериал \"" + title + "\" 🎉. Теперь он отмечен как завершённый. ", mainMenu);
+                            return;
+                        }
+                        case "set_restart" -> {
+                            seriesService.setStatus(chatId, title, "");
+                            seriesService.saveOrUpdate(chatId, title, 1, 1);
+                            session.state = State.IDLE;
+                            session.selectedTitle = null;
+                            sendReply(chatId, "Сериал \"" + title + "\" сброшен: снова Сезон 1, Эпизод 1.", mainMenu);
+                            return;
                         }
                     }
                 }

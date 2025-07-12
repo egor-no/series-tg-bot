@@ -4,6 +4,7 @@ public class Series {
     private String name;
     private int season;
     private int episode;
+    private String status = "";
 
     public Series(String name, int season, int episode) {
         this.name = name;
@@ -33,5 +34,13 @@ public class Series {
 
     public void setEpisode(int episode) {
         this.episode = episode;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
     }
 }
