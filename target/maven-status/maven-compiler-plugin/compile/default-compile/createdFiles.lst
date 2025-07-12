@@ -1,6 +1,10 @@
 Main.class
-SeriesProgressBot.class
 SeriesProgressBot$1.class
-ParsedTitle.class
+data\DataSourceProvider.class
 State.class
 UserSession.class
+SeriesProgressBot.class
+ParsedTitle.class
+data\SeriesProgressDAO.class
+SeriesStorage.class
+data\Series.class
