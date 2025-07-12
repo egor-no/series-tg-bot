@@ -206,6 +206,8 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
 
         //КНОПКИ
         if (update.hasCallbackQuery()) {
+            System.out.println("CallbackQuery received: " + update.getCallbackQuery().getData());
+
             String data = update.getCallbackQuery().getData();
             long chatId = update.getCallbackQuery().getMessage().getChatId();
             UserSession session = sessions.computeIfAbsent(chatId, id -> new UserSession());
@@ -254,14 +256,6 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                 Series s = seriesService.getByName(chatId, title);
 
                 if (s != null) {
-                    if (!data.startsWith("set_")
-                            && !data.startsWith("rename_")
-                            && !data.startsWith("delete_")
-                            && !Set.of("set_manual", "set_next_ep", "set_next_season", "set_finish", "set_restart").contains(data)) {
-                        session.state = State.IDLE;
-                        session.selectedTitle = null;
-                    }
-
                     switch (data) {
                         case "set_manual" -> {
                             session.state = State.AWAITING_SET_SEASON;
@@ -289,6 +283,7 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                             sendReply(chatId, "Сериал \"" + title + "\" сброшен: снова Сезон 1, Эпизод 1.", mainMenu);
                             return;
                         }
+
                     }
                 }
 
@@ -314,6 +309,7 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                 return;
             }
 
+            System.out.println("Callback data: " + data);
             switch (data) {
                 case "add" -> {
                     session.state = State.AWAITING_ADD;
@@ -349,8 +345,16 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                     sendReply(chatId, "Выбери сериал для удаления:",
                             buildSeriesChoiceMenu(chatId, "delete_", "❌"));
                 }
-                case "status" -> sendReply(chatId, handleStatus(chatId), mainMenu);
+                case "status" -> {
+                    try {
+                        sendReply(chatId, handleStatus(chatId), mainMenu);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        sendReply(chatId, "Произошла ошибка при выводе статуса.", mainMenu);
+                    }
+                }
                 default -> {
+                    System.out.println("Unhandled callback: " + data);
                     sendReply(chatId, "Неизвестная кнопка.", mainMenu);
                 }
             }
