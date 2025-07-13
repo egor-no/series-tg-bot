@@ -15,10 +15,12 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
     private final SeriesProgressService seriesService;
     private final Map<Long, UserSession> sessions = new HashMap<>();
     private final InlineKeyboardMarkup mainMenu;
+    private final InlineKeyboardMarkup emptymenu;
 
     public SeriesProgressBot(SeriesProgressService seriesService) {
         this.seriesService = seriesService;
         this.mainMenu = buildMainMenu();
+        this.emptymenu = buildEmptyMenu();
     }
 
     @Override
@@ -29,6 +31,15 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
     @Override
     public String getBotToken() {
         return System.getenv("BOT_TOKEN");
+    }
+
+    private InlineKeyboardMarkup getMenu(long chatId) {
+        List<Series> list = seriesService.getAll(chatId);
+        if (list.isEmpty()) {
+            return emptymenu;
+        } else {
+            return mainMenu;
+        }
     }
 
     private void sendReply(long chatId, String text, InlineKeyboardMarkup markup) {
@@ -104,28 +115,39 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                 .callbackData("add")
                 .build());
         row.add(InlineKeyboardButton.builder()
-                .text("✏\uFE0F Переименовать сериал")
-                .callbackData("rename")
-                .build());
-        row.add(InlineKeyboardButton.builder()
                 .text("❌ Удалить сериал")
                 .callbackData("delete")
                 .build());
         rows.add(row);
         row = new ArrayList<>();
         row.add(InlineKeyboardButton.builder()
-                .text("📋 Статус")
-                .callbackData("status")
+                .text("✏\uFE0F Переименовать сериал")
+                .callbackData("rename")
                 .build());
         row.add(InlineKeyboardButton.builder()
                 .text("⚙ Обновить прогресс")
                 .callbackData("set")
                 .build());
         rows.add(row);
+        row = new ArrayList<>();
+        row.add(InlineKeyboardButton.builder()
+                .text("📋 Список моих сериалов")
+                .callbackData("status")
+                .build());
+        rows.add(row);
 
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         markup.setKeyboard(rows);
         return markup;
+    }
+
+    private InlineKeyboardMarkup buildEmptyMenu() {
+        InlineKeyboardButton addButton = InlineKeyboardButton.builder()
+                .text("➕ Добавить сериал")
+                .callbackData("add")
+                .build();
+        List<List<InlineKeyboardButton>> rows = List.of(List.of(addButton));
+        return InlineKeyboardMarkup.builder().keyboard(rows).build();
     }
 
     private InlineKeyboardMarkup buildSeriesChoiceMenu(long chatId, String callbackPrefix, String icon) {
@@ -219,9 +241,9 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                                        \s
                                         Бот ещё в бета-версии, поэтому не обижайтесь на ошибки.\s
                                        \s
-                                        Выбирай действие из меню ниже 👇""", mainMenu);
+                                        Выбирай действие из меню ниже 👇""", getMenu(chatId));
                     } else {
-                        sendReply(chatId, "Неизвестная команда. Выбери из меню", mainMenu);
+                        sendReply(chatId, "Неизвестная команда. Выбери из меню", getMenu(chatId));
                     }
                 }
             }
@@ -330,7 +352,7 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                 seriesService.delete(chatId, title);
                 int messageId = update.getCallbackQuery().getMessage().getMessageId();
                 deleteMessage(chatId, messageId);
-                sendReply(chatId, "Сериал \"" + title + "\" удалён.", mainMenu);
+                sendReply(chatId, "Сериал \"" + title + "\" удалён.", getMenu(chatId));
                 session.state = State.IDLE;
                 return;
             }
@@ -345,50 +367,29 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                 return;
             }
 
+            int messageId = update.getCallbackQuery().getMessage().getMessageId();
+            deleteMessage(chatId, messageId);
             switch (data) {
                 case "add" -> {
                     session.state = State.AWAITING_ADD;
-                    sendReply(chatId, "Введи сериал (можно сразу с сезоном и эпизодом):", null);
+                    sendReply(chatId, "Введи название сериала (можно сразу с сезоном и эпизодом - задай два числа через пробел, бел запятых):", null);
                 }
                 case "set" -> {
-                    List<Series> list = seriesService.getAll(chatId);
-                    if (list.isEmpty()) {
-                        int messageId = update.getCallbackQuery().getMessage().getMessageId();
-                        deleteMessage(chatId, messageId);
-                        sendReply(chatId, "У тебя пока нет сериалов.", mainMenu);
-                        return;
-                    }
                     session.state = State.AWAITING_SET_CHOICE;
                     sendReply(chatId, "Выбери сериал для обновления:",
                             buildSeriesChoiceMenu(chatId, "set_", "🎬"));
                 }
                 case "rename" -> {
-                    List<Series> list = seriesService.getAll(chatId);
-                    int messageId = update.getCallbackQuery().getMessage().getMessageId();
-                    deleteMessage(chatId, messageId);
-                    if (list.isEmpty()) {
-                        sendReply(chatId, "У тебя пока нет сериалов.", mainMenu);
-                        return;
-                    }
                     session.state = State.AWAITING_RENAME_CHOICE;
                     sendReply(chatId, "Выбери сериал для переименования:",
                             buildSeriesChoiceMenu(chatId, "rename_", "✏\uFE0F"));
                 }
                 case "delete" -> {
-                    List<Series> list = seriesService.getAll(chatId);
-                    int messageId = update.getCallbackQuery().getMessage().getMessageId();
-                    deleteMessage(chatId, messageId);
-                    if (list.isEmpty()) {
-                        sendReply(chatId, "У тебя пока нет сериалов.", mainMenu);
-                        return;
-                    }
                     session.state = State.AWAITING_DELETE_CHOICE;
                     sendReply(chatId, "Выбери сериал для удаления:",
                             buildSeriesChoiceMenu(chatId, "delete_", "❌"));
                 }
                 case "status" -> {
-                    int messageId = update.getCallbackQuery().getMessage().getMessageId();
-                    deleteMessage(chatId, messageId);
                     try {
                         sendReply(chatId, handleStatus(chatId), mainMenu);
                     } catch (Exception e) {
@@ -397,8 +398,6 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                     }
                 }
                 default -> {
-                    int messageId = update.getCallbackQuery().getMessage().getMessageId();
-                    deleteMessage(chatId, messageId);
                     System.out.println("Unhandled callback: " + data);
                     sendReply(chatId, "Неизвестная кнопка.", mainMenu);
                 }
