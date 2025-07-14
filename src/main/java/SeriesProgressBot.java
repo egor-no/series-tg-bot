@@ -164,6 +164,13 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                 })
                 .collect(Collectors.toList());
 
+        rows.add(List.of(
+                InlineKeyboardButton.builder()
+                        .text("🔙 Назад")
+                        .callbackData("cancel")
+                        .build()
+        ));
+
         return InlineKeyboardMarkup.builder().keyboard(rows).build();
     }
 
@@ -352,7 +359,13 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                 seriesService.delete(chatId, title);
                 int messageId = update.getCallbackQuery().getMessage().getMessageId();
                 deleteMessage(chatId, messageId);
-                sendReply(chatId, "Сериал \"" + title + "\" удалён.", getMenu(chatId));
+
+                InlineKeyboardMarkup menu = getMenu(chatId);
+                if (menu == emptymenu) {
+                    sendReply(chatId, "Сериал \"" + title + "\" удалён. Вы удалили все сериалы из своего списка. ", menu);
+                } else {
+                    sendReply(chatId, "Сериал \"" + title + "\" удалён.", menu);
+                }
                 session.state = State.IDLE;
                 return;
             }
@@ -396,6 +409,10 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                         e.printStackTrace();
                         sendReply(chatId, "Произошла ошибка при выводе статуса.", mainMenu);
                     }
+                }
+                case "cancel" -> {
+                    session.state = State.IDLE;
+                    sendReply(chatId, "Окей, возвращаемся в главное меню.", mainMenu);
                 }
                 default -> {
                     System.out.println("Unhandled callback: " + data);
