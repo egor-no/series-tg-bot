@@ -363,10 +363,6 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                     switch (data) {
                         case "set_manual" -> {
                             session.state = State.AWAITING_SET_SEASON;
-                            if (session.lastBotMessageId != null) {
-                                removeKeyboard(chatId, session.lastBotMessageId);
-                                session.lastBotMessageId = null;
-                            }
                             sendReply(chatId, "Укажи сезон для \"" + title + "\":", cancelMenu);
                             return;
                         }
@@ -377,11 +373,6 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                             seriesService.saveOrUpdate(chatId, title, s.getSeason() + 1, 1);
                         }
                         case "set_finish" -> {
-                            if (session.lastBotMessageId != null) {
-                                removeKeyboard(chatId, session.lastBotMessageId);
-                                session.lastBotMessageId = null;
-                            }
-
                             seriesService.setStatus(chatId, title, "finished");
                             session.state = State.IDLE;
                             session.selectedTitle = null;
@@ -389,11 +380,6 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                             return;
                         }
                         case "set_restart" -> {
-                            if (session.lastBotMessageId != null) {
-                                removeKeyboard(chatId, session.lastBotMessageId);
-                                session.lastBotMessageId = null;
-                            }
-
                             seriesService.setStatus(chatId, title, "");
                             seriesService.saveOrUpdate(chatId, title, 1, 1);
                             session.state = State.IDLE;
