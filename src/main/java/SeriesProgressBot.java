@@ -431,6 +431,7 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
 
             int messageId = update.getCallbackQuery().getMessage().getMessageId();
             deleteMessage(chatId, messageId);
+            session.lastBotMessageId = null;
             switch (data) {
                 case "add" -> {
                     session.state = State.AWAITING_ADD;
@@ -460,14 +461,13 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                     }
                 }
                 case "cancel" -> {
-                    if (session.lastBotMessageId != null) {
-                        removeKeyboard(chatId, session.lastBotMessageId);
-                        session.lastBotMessageId = null;
-                    }
-
                     switch (session.state) {
-                        case AWAITING_ADD ->  sendReply(chatId, "❌ Добавление отменено.", null);
-                        case AWAITING_RENAME_INPUT ->  sendReply(chatId, "❌ Переименование отменено.", null);
+                        case AWAITING_ADD ->  {
+                            sendReply(chatId, "❌ Добавление отменено.", null);
+                        }
+                        case AWAITING_RENAME_INPUT ->  {
+                            sendReply(chatId, "❌ Переименование отменено.", null);
+                        }
                         case AWAITING_SET_CHOICE, AWAITING_SET_ACTION, AWAITING_SET_SEASON, AWAITING_SET_EPISODE -> sendReply(chatId, "❌ Обновление прогресса отменено.", null);
                         default -> {}
                     };
