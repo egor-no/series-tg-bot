@@ -15,14 +15,6 @@ public class Main {
         } catch (Exception e) {
             e.printStackTrace();
         }
-
-        try {
-            DataSource ds = DataSourceProvider.getDataSource();
-            ds.getConnection().close();
-            System.out.println("✅ Connection to Railway DB successful!");
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 
 }
