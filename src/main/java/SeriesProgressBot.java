@@ -3,6 +3,8 @@ import data.SeriesProgressService;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageReplyMarkup;
+import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
@@ -101,15 +103,15 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
         response.setChatId(String.valueOf(chatId));
         response.setText(text);
         if (markup != null) response.setReplyMarkup(markup);
+
         try {
-            execute(response);
+            Message message = execute(response);
+            if (markup == cancelMenu) {
+                sessions.computeIfAbsent(chatId, id -> new UserSession()).lastBotMessageId = message.getMessageId();
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }
-
-    private boolean isNumeric(String str) {
-        return str.matches("\\d+");
     }
 
     private ParsedTitle parseTitleSeasonEpisode(String input) {
@@ -131,6 +133,22 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
         }
 
         return new ParsedTitle(title, season, episode);
+    }
+
+    private boolean isNumeric(String str) {
+        return str.matches("\\d+");
+    }
+
+    private void removeKeyboard(long chatId, int messageId) {
+        try {
+            EditMessageReplyMarkup editMarkup = new EditMessageReplyMarkup();
+            editMarkup.setChatId(String.valueOf(chatId));
+            editMarkup.setMessageId(messageId);
+            editMarkup.setReplyMarkup(null);
+            execute(editMarkup);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     private void deleteMessage(long chatId, int messageId) {
@@ -199,6 +217,10 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                     int season = parsed.season() >= 0 ? parsed.season() : 1;
                     int episode = parsed.episode() >= 0 ? parsed.episode() : 1;
                     seriesService.saveOrUpdate(chatId, parsed.title(), season, episode);
+                    if (session.lastBotMessageId != null) {
+                        removeKeyboard(chatId, session.lastBotMessageId);
+                        session.lastBotMessageId = null;
+                    }
                     sendReply(chatId, "Добавлено: " + parsed.title() + " — Сезон " + season + ", Эпизод " + episode
                             + ". Что ещё хочешь сделать?", mainMenu);
                 }
@@ -207,6 +229,10 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                         int season = Integer.parseInt(text);
                         session.manualSeason = season;
                         session.state = State.AWAITING_SET_EPISODE;
+                        if (session.lastBotMessageId != null) {
+                            removeKeyboard(chatId, session.lastBotMessageId);
+                            session.lastBotMessageId = null;
+                        }
                         sendReply(chatId, "Теперь эпизод?", cancelMenu);
                     } catch (NumberFormatException e) {
                         sendReply(chatId, "Сезон должен быть числом", cancelMenu);
@@ -221,6 +247,10 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                         session.state = State.IDLE;
                         session.selectedTitle = null;
                         session.manualSeason = null;
+                        if (session.lastBotMessageId != null) {
+                            removeKeyboard(chatId, session.lastBotMessageId);
+                            session.lastBotMessageId = null;
+                        }
                         sendReply(chatId, "Установлено: " + title + " — Сезон " + season + ", Эпизод " + episode, mainMenu);
                     } catch (NumberFormatException e) {
                         sendReply(chatId, "Эпизод должен быть числом", cancelMenu);
@@ -239,6 +269,11 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                     if (s != null) {
                         seriesService.delete(chatId, oldTitle);
                         seriesService.saveOrUpdate(chatId, newTitle, s.getSeason(), s.getEpisode());
+                    }
+
+                    if (session.lastBotMessageId != null) {
+                        removeKeyboard(chatId, session.lastBotMessageId);
+                        session.lastBotMessageId = null;
                     }
 
                     session.state = State.IDLE;
@@ -328,6 +363,10 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                     switch (data) {
                         case "set_manual" -> {
                             session.state = State.AWAITING_SET_SEASON;
+                            if (session.lastBotMessageId != null) {
+                                removeKeyboard(chatId, session.lastBotMessageId);
+                                session.lastBotMessageId = null;
+                            }
                             sendReply(chatId, "Укажи сезон для \"" + title + "\":", cancelMenu);
                             return;
                         }
@@ -338,6 +377,11 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                             seriesService.saveOrUpdate(chatId, title, s.getSeason() + 1, 1);
                         }
                         case "set_finish" -> {
+                            if (session.lastBotMessageId != null) {
+                                removeKeyboard(chatId, session.lastBotMessageId);
+                                session.lastBotMessageId = null;
+                            }
+
                             seriesService.setStatus(chatId, title, "finished");
                             session.state = State.IDLE;
                             session.selectedTitle = null;
@@ -345,6 +389,11 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                             return;
                         }
                         case "set_restart" -> {
+                            if (session.lastBotMessageId != null) {
+                                removeKeyboard(chatId, session.lastBotMessageId);
+                                session.lastBotMessageId = null;
+                            }
+
                             seriesService.setStatus(chatId, title, "");
                             seriesService.saveOrUpdate(chatId, title, 1, 1);
                             session.state = State.IDLE;
@@ -390,7 +439,7 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                 session.state = State.AWAITING_RENAME_INPUT;
                 int messageId = update.getCallbackQuery().getMessage().getMessageId();
                 deleteMessage(chatId, messageId);
-                sendReply(chatId, "Введи новое название для \"" + oldTitle + "\":", null);
+                sendReply(chatId, "Введи новое название для \"" + oldTitle + "\":", cancelMenu);
                 return;
             }
 
@@ -398,6 +447,7 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
             deleteMessage(chatId, messageId);
             switch (data) {
                 case "add" -> {
+                    session.state = State.AWAITING_ADD;
                     sendReply(chatId, "Введи название сериала (можно сразу с сезоном и эпизодом — задай два числа через пробел, без запятых):", cancelMenu);
                 }
                 case "set" -> {
@@ -424,8 +474,14 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                     }
                 }
                 case "cancel" -> {
+                    if (session.lastBotMessageId != null) {
+                        removeKeyboard(chatId, session.lastBotMessageId);
+                        session.lastBotMessageId = null;
+                    }
+
                     switch (session.state) {
                         case AWAITING_ADD ->  sendReply(chatId, "❌ Добавление отменено.", null);
+                        case AWAITING_RENAME_INPUT ->  sendReply(chatId, "❌ Переименование отменено.", null);
                         case AWAITING_SET_CHOICE, AWAITING_SET_ACTION, AWAITING_SET_SEASON, AWAITING_SET_EPISODE -> sendReply(chatId, "❌ Обновление прогресса отменено.", null);
                         default -> {}
                     };
@@ -434,7 +490,7 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                     session.selectedTitle = null;
                     session.manualSeason = null;
 
-                    sendReply(chatId, "Окей, возвращаемся в главное меню.", mainMenu);
+                    sendReply(chatId, "Окей, возвращаемся в главное меню.", getMenu(chatId));
                 }
                 default -> {
                     System.out.println("Unhandled callback: " + data);
