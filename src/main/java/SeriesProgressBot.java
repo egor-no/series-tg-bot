@@ -331,10 +331,6 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                                 InlineKeyboardButton.builder().text("⏭ Следующий эпизод").callbackData("set_next_ep").build(),
                                 InlineKeyboardButton.builder().text("📅 Следующий сезон").callbackData("set_next_season").build()
                         ));
-                rows.add(List.of(
-                        InlineKeyboardButton.builder().text("🔙 Назад").callbackData("cancel").build()
-                ));
-
                 if ("finished".equalsIgnoreCase(s.getStatus())) {
                     rows.add(List.of(
                             InlineKeyboardButton.builder()
@@ -343,6 +339,9 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                                     .build()
                     ));
                 }
+                rows.add(List.of(
+                        InlineKeyboardButton.builder().text("🔙 Назад").callbackData("cancel").build()
+                ));
 
                 markup.setKeyboard(rows);
 
