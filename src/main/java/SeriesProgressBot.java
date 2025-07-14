@@ -352,7 +352,7 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                 return;
             }
 
-            if (session.state == State.AWAITING_SET_ACTION) {
+            if (session.state == State.AWAITING_SET_ACTION && data.startsWith("set")) {
                 String title = session.selectedTitle;
                 Series s = seriesService.getByName(chatId, title);
 
@@ -460,15 +460,8 @@ public class SeriesProgressBot extends TelegramLongPollingBot {
                     }
                 }
                 case "cancel" -> {
-                    switch (session.state) {
-                        case AWAITING_ADD ->  {
-                            sendReply(chatId, "❌ Добавление отменено.", null);
-                        }
-                        case AWAITING_RENAME_INPUT ->  {
-                            sendReply(chatId, "❌ Переименование отменено.", null);
-                        }
-                        case AWAITING_SET_CHOICE, AWAITING_SET_ACTION, AWAITING_SET_SEASON, AWAITING_SET_EPISODE -> sendReply(chatId, "❌ Обновление прогресса отменено.", null);
-                        default -> {}
+                    if (session.state == State.AWAITING_SET_EPISODE) {
+                        sendReply(chatId, "❌ Обновление прогресса отменено.", null);
                     };
 
                     session.state = State.IDLE;
